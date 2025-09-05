@@ -1,0 +1,19 @@
+name: opentofu
+services:
+  opentofu:
+    container_name: opentofu
+    build:
+      context: .
+      dockerfile: ./dockerfile
+    volumes:
+      - type: bind
+        source: ./opentofu
+        target: /home/opentofu/opentofu
+      - type: bind
+        source: ./opentofuWriteback
+        target: /home/opentofu/opentofuWriteback
+    secrets:
+      - proxmoxApiKeyForOpenTofu.tfvars.json
+secrets:
+  proxmoxApiKeyForOpenTofu.tfvars.json:
+    file: ./opentofuSecrets/proxmoxApiKeyForOpenTofu.tfvars.json
