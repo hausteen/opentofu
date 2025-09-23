@@ -37,4 +37,9 @@ resource "proxmox_virtual_environment_vm" "dns" {
     bridge = "vmbr1"
     firewall = true
   }
+  lifecycle {
+    ignore_changes = [
+      initialization
+    ]
+  }
 }
