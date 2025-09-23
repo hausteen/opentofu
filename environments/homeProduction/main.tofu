@@ -13,6 +13,7 @@ resource "proxmox_virtual_environment_vm" "dns" {
     ip_config {
       ipv4 {
         address = "192.168.20.2/24"
+        gateway = "192.168.20.1"
       }
     }
   }
