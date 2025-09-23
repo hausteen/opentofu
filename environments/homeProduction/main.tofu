@@ -19,16 +19,21 @@ resource "proxmox_virtual_environment_vm" "dns" {
   disk {
     size = 10
     interface = "scsi0"
+    discard = "on"
+    iothread = true
+    ssd = true
   }
   cpu {
-    cores = 2
+    cores = 1
     type = "x86-64-v2-AES"
   }
   memory {
-    dedicated = 2048
-    floating = 2048
+    dedicated = 1024
+    floating = 1024
   }
   network_device {
     vlan_id = 20
+    bridge = "vmbr1"
+    firewall = true
   }
 }
