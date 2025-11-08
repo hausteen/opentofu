@@ -1,17 +1,17 @@
 # Create the secrets for the Talos cluster
 # Like talosctl gen secrets -o secrets.yaml
 resource "talos_machine_secrets" "this" {
-  talos_version = element(data.talos_image_factory_versions.this.talos_versions, length(data.talos_image_factory_versions.this.talos_versions) - 1)
+  talos_version = var.talos_version
 }
 
 # Get the machine configuration for the control plane nodes
 # Like talosctl gen config --with-secrets secrets.yaml <CLUSTER_NAME> https://<CLUSTER_ENDPOINT>:6443 --install-image factory.talos.dev/<nocloud>-installer-<secureboot>/<hash>:v<version>
 data "talos_machine_configuration" "control_plane" {
   machine_type     = "controlplane"
-  cluster_name     = var.cluster_name
-  cluster_endpoint = "https://${var.talos_cp_01_ip_addr}:6443"
+  cluster_name     = var.talos_cluster_name
+  cluster_endpoint = var.talos_cluster_endpoint
   machine_secrets  = talos_machine_secrets.this.machine_secrets
-  talos_version    = element(data.talos_image_factory_versions.this.talos_versions, length(data.talos_image_factory_versions.this.talos_versions) - 1)
+  talos_version    = var.talos_version
   config_patches   = [
     yamlencode({
       "machine": {
@@ -33,10 +33,10 @@ data "talos_machine_configuration" "control_plane" {
 # Like talosctl gen config --with-secrets secrets.yaml <CLUSTER_NAME> https://<CLUSTER_ENDPOINT>:6443 --install-image factory.talos.dev/<nocloud>-installer-<secureboot>/<hash>:v<version>
 data "talos_machine_configuration" "worker" {
   machine_type     = "worker"
-  cluster_name     = var.cluster_name
-  cluster_endpoint = "https://${var.talos_cp_01_ip_addr}:6443"
+  cluster_name     = var.talos_cluster_name
+  cluster_endpoint = var.talos_cluster_endpoint
   machine_secrets  = talos_machine_secrets.this.machine_secrets
-  talos_version    = element(data.talos_image_factory_versions.this.talos_versions, length(data.talos_image_factory_versions.this.talos_versions) - 1)
+  talos_version    = var.talos_version
     config_patches   = [
     yamlencode({
       "machine": {
@@ -59,19 +59,20 @@ data "talos_machine_configuration" "worker" {
 # Like talosctl config endpoint <CONTROL_PLANE_IPs / CLUSTER_ENDPOINT> --talosconfig talosconfig
 # Like talosctl config node <CONTROL_PLANE_IPs> --talosconfig talosconfig
 data "talos_client_configuration" "this" {
-  cluster_name         = var.cluster_name
+  cluster_name         = var.talos_cluster_name
   client_configuration = talos_machine_secrets.this.client_configuration
-  nodes                = [var.talos_cp_01_ip_addr]
-  endpoints            = [var.talos_cp_01_ip_addr]
+  nodes                = [ for k, v in var.talos_node_data.control_planes: v.ip ]
+  endpoints            = [ for k, v in var.talos_node_data.control_planes: v.ip ]
 }
 
 # Apply the control_plane machine configuration to the control plane nodes
 # Like talosctl apply-config --insecure --nodes $CONTROL_PLANE_IPs --file controlplane.yaml
 resource "talos_machine_configuration_apply" "control_plane" {
-  depends_on                  = [ proxmox_virtual_environment_vm.talos-cp-01 ]
   client_configuration        = talos_machine_secrets.this.client_configuration
   machine_configuration_input = data.talos_machine_configuration.control_plane.machine_configuration
-  node                        = var.talos_cp_01_ip_addr
+  for_each                    = var.talos_node_data.control_planes
+  node                        = each.value.ip
+  depends_on                  = [ proxmox_virtual_environment_vm.talos_control_plane ]
 }
 
 # Bootstrap the Talos cluster by selecting only 1 control plane node to bootstrap
@@ -79,57 +80,30 @@ resource "talos_machine_configuration_apply" "control_plane" {
 resource "talos_machine_bootstrap" "this" {
   depends_on           = [ talos_machine_configuration_apply.control_plane ]
   client_configuration = talos_machine_secrets.this.client_configuration
-  node                 = var.talos_cp_01_ip_addr
-}
-
-# Wait for the Talos cluster control plane to be healthy before adding worker nodes.
-data "talos_cluster_health" "control_plane" {
-  client_configuration = talos_machine_secrets.this.client_configuration
-  endpoints            = data.talos_client_configuration.this.endpoints
-  control_plane_nodes  = [ var.talos_cp_01_ip_addr ]
-}
-
-# Get the kubeconfig
-resource "talos_cluster_kubeconfig" "this" {
-  depends_on           = [ data.talos_cluster_health.control_plane ]
-  client_configuration = talos_machine_secrets.this.client_configuration
-  node                 = var.talos_cp_01_ip_addr
+  node                 = [ for k, v in var.talos_node_data.control_planes: v.ip ][0]
 }
 
 # Apply the worker machine configuration to the worker nodes
 # Like talosctl apply-config --insecure --nodes WORKER_IPs --file worker.yaml
 resource "talos_machine_configuration_apply" "worker" {
-  depends_on                  = [ data.talos_cluster_health.control_plane, proxmox_virtual_environment_vm.talos-worker-01 ]
   client_configuration        = talos_machine_secrets.this.client_configuration
   machine_configuration_input = data.talos_machine_configuration.worker.machine_configuration
-  node                        = var.talos_worker_01_ip_addr
+  for_each                    = var.talos_node_data.workers
+  node                        = each.value.ip
+  depends_on                  = [ resource.talos_machine_bootstrap.this, proxmox_virtual_environment_vm.talos_worker ]
 }
 
 # Wait for the whole Talos cluster to be healthy; both control plane and workers.
 data "talos_cluster_health" "whole_cluster" {
   client_configuration = talos_machine_secrets.this.client_configuration
   endpoints            = data.talos_client_configuration.this.endpoints
-  control_plane_nodes  = [ var.talos_cp_01_ip_addr ]
-  worker_nodes         = [ var.talos_worker_01_ip_addr ]
+  control_plane_nodes  = [ for k, v in var.talos_node_data.control_planes: v.ip ]
+  worker_nodes         = [ for k, v in var.talos_node_data.workers: v.ip ]
 }
 
-# Provide output variables
-output "kubeconfig" {
-  value = resource.talos_cluster_kubeconfig.this.kubeconfig_raw
-  sensitive = true
+# Get the kubeconfig after whole cluster is set up.
+resource "talos_cluster_kubeconfig" "this" {
+  depends_on           = [ data.talos_cluster_health.whole_cluster ]
+  client_configuration = talos_machine_secrets.this.client_configuration
+  node                 = [ for k, v in var.talos_node_data.control_planes: v.ip ][0]
 }
-
-output "talosconfig" {
-  value = data.talos_client_configuration.this.talos_config
-  sensitive = true
-}
-
-# output "control_plane_machine_configuration" {
-#   value = data.talos_machine_configuration.control_plane.machine_configuration
-#   sensitive = true
-# }
-
-# output "worker_machine_configuration" {
-#   value = data.talos_machine_configuration.worker.machine_configuration
-#   sensitive = true
-# }

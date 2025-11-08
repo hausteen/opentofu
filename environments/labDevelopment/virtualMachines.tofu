@@ -1,9 +1,10 @@
-resource "proxmox_virtual_environment_vm" "talos-cp-01" {
-  name = "talos-cp-01"
+resource "proxmox_virtual_environment_vm" "talos_control_plane" {
+  for_each = var.talos_node_data.control_planes
+  name = "${each.key}"
   description = "Managed by OpenTofu."
   tags = ["kubernetes", "opentofu", "talos"] # Need to be in alphabetical order
-  node_name = "pve1"
-  vm_id = 100
+  node_name = "${each.value.proxmox_node}"
+  vm_id = each.value.vm_id
   on_boot = true
   operating_system {
     type = "l26"
@@ -52,23 +53,24 @@ resource "proxmox_virtual_environment_vm" "talos-cp-01" {
     interface = "scsi1"
     ip_config {
       ipv4 {
-        address = "${var.talos_cp_01_ip_addr}/24"
-        gateway = var.default_gateway
+        address = "${each.value.ip}/24"
+        gateway = var.talos_default_gateway
       }
     }
     dns {
       #domain = "hunt.internal"
-      servers = ["1.1.1.1"]
+      servers = ["1.1.1.1", "8.8.8.8"]
     }
   }
 }
 
-resource "proxmox_virtual_environment_vm" "talos-worker-01" {
-  name = "talos-worker-01"
+resource "proxmox_virtual_environment_vm" "talos_worker" {
+  for_each = var.talos_node_data.workers
+  name = "${each.key}"
   description = "Managed by OpenTofu."
   tags = ["kubernetes", "opentofu", "talos"] # Need to be in alphabetical order
-  node_name = "pve1"
-  vm_id = 101
+  node_name = "${each.value.proxmox_node}"
+  vm_id = each.value.vm_id
   on_boot = true
   operating_system {
     type = "l26"
@@ -117,13 +119,13 @@ resource "proxmox_virtual_environment_vm" "talos-worker-01" {
     interface = "scsi1"
     ip_config {
       ipv4 {
-        address = "${var.talos_worker_01_ip_addr}/24"
-        gateway = var.default_gateway
+        address = "${each.value.ip}/24"
+        gateway = var.talos_default_gateway
       }
     }
     dns {
       #domain = "hunt.internal"
-      servers = ["1.1.1.1"]
+      servers = ["1.1.1.1", "8.8.8.8"]
     }
   }
 }
