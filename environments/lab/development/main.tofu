@@ -56,7 +56,7 @@ resource "proxmox_virtual_environment_vm" "talos_control_plane" {
   for_each = var.talos_node_data.control_planes
   name = each.key
   description = "Managed by OpenTofu."
-  tags = ["kubernetes", "opentofu", "talos"] # Need to be in alphabetical order
+  tags = ["development", "kubernetes", "lab", "opentofu", "talos"] # Need to be in alphabetical order
   node_name = each.value.proxmox_node
   vm_id = each.value.vm_id
   on_boot = true
@@ -122,7 +122,7 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
   for_each = var.talos_node_data.workers
   name = each.key
   description = "Managed by OpenTofu."
-  tags = ["kubernetes", "opentofu", "talos"] # Need to be in alphabetical order
+  tags = ["development", "kubernetes", "lab", "opentofu", "talos"] # Need to be in alphabetical order
   node_name = each.value.proxmox_node
   vm_id = each.value.vm_id
   on_boot = true
@@ -277,6 +277,177 @@ resource "talos_cluster_kubeconfig" "this" {
   client_configuration = talos_machine_secrets.this.client_configuration
   node                 = [ for k, v in var.talos_node_data.control_planes: v.ip ][0]
   depends_on           = [ resource.talos_machine_configuration_apply.worker ]
+}
+
+####################################################################################################################################################################################
+# Debian Linux - image download
+
+# resource "proxmox_virtual_environment_download_file" "debian_linux_image" {
+#   content_type = "import"
+#   datastore_id = "local"
+#   node_name    = "pve1"
+#   url          = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+#   # url          = "https://cloud.debian.org/images/cloud/trixie/20251117-2299/debian-13-genericcloud-amd64-20251117-2299.qcow2" # Working image if I need to pin it to specific version
+# }
+
+####################################################################################################################################################################################
+# Alpine Linux - image download
+
+resource "proxmox_virtual_environment_download_file" "alpine_linux_image" {
+  content_type = "import"
+  datastore_id = "local"
+  node_name    = "pve1"
+  url          = "https://dl-cdn.alpinelinux.org/alpine/v${substr(var.alpine_linux_version, 0, 4)}/releases/cloud/nocloud_alpine-${var.alpine_linux_version}-x86_64-uefi-cloudinit-r0.qcow2"
+}
+
+####################################################################################################################################################################################
+# OpenBao - virtual machine creation
+
+# Debian
+# resource "proxmox_virtual_environment_vm" "openbao1" {
+#   name = "openbao1"
+#   description = "Managed by OpenTofu."
+#   tags = ["development", "lab", "opentofu"] # Need to be in alphabetical order
+#   node_name = "pve1"
+#   vm_id = 100
+#   on_boot = true
+#   operating_system {
+#     type = "l26"
+#   }
+#   machine = "q35"
+#   bios = "ovmf"
+#   efi_disk {
+#     datastore_id = "local-lvm"
+#     pre_enrolled_keys = true
+#     type = "4m"
+#   }
+#   scsi_hardware = "virtio-scsi-single"
+#   agent {
+#     enabled = true
+#     timeout = "1m"
+#   }
+#   tpm_state {
+#     datastore_id = "local-lvm"
+#     version = "v2.0"
+#   }
+#   disk {
+#     datastore_id = "local-lvm"
+#     import_from  = proxmox_virtual_environment_download_file.debian_linux_image.id
+#     interface    = "scsi0"
+#     iothread     = true
+#     discard      = "on"
+#     ssd          = true
+#     size         = 10
+#   }
+#   cpu {
+#     cores = 2
+#     type  = "x86-64-v2-AES"
+#   }
+#   memory {
+#     dedicated = 2048
+#     floating = 2048
+#   }
+#   network_device {
+#     bridge = "vmbr1"
+#     vlan_id = 20
+#   }
+#   boot_order = ["scsi0"]
+#   initialization {
+#     interface = "scsi1"
+#     ip_config {
+#       ipv4 {
+#         address = "192.168.20.50/24"
+#         gateway = "192.168.20.1"
+#       }
+#     }
+#     user_account {
+#       username = "debian"
+#       password = "debian"
+#     }
+#     dns {
+#       domain = "development.lab.hunt.internal"
+#       servers = ["1.1.1.1"]
+#     }
+#     vendor_data_file_id = "local:snippets/debian_cloud_init_vendor_data.yml"
+#   }
+#   # lifecycle {
+#   #   ignore_changes = [
+#   #     initialization
+#   #   ]
+#   # }
+# }
+
+# Alpine
+resource "proxmox_virtual_environment_vm" "openbao2" {
+  name = "openbao2"
+  description = "Managed by OpenTofu."
+  tags = ["development", "lab", "opentofu"] # Need to be in alphabetical order
+  node_name = "pve1"
+  vm_id = 101
+  on_boot = true
+  operating_system {
+    type = "l26"
+  }
+  machine = "q35"
+  bios = "ovmf"
+  efi_disk {
+    datastore_id = "local-lvm"
+    type = "4m"
+  }
+  scsi_hardware = "virtio-scsi-single"
+  agent {
+    enabled = true
+    timeout = "2m"
+  }
+  tpm_state {
+    datastore_id = "local-lvm"
+    version = "v2.0"
+  }
+  disk {
+    datastore_id = "local-lvm"
+    import_from  = proxmox_virtual_environment_download_file.alpine_linux_image.id
+    interface    = "scsi0"
+    iothread     = true
+    discard      = "on"
+    ssd          = true
+    size         = 10
+  }
+  cpu {
+    cores = 2
+    type  = "x86-64-v2-AES"
+  }
+  memory {
+    dedicated = 2048
+    floating = 2048
+  }
+  network_device {
+    bridge = "vmbr1"
+    vlan_id = 20
+  }
+  boot_order = ["scsi0"]
+  initialization {
+    interface = "scsi1"
+    ip_config {
+      ipv4 {
+        address = "192.168.20.51/24"
+        gateway = "192.168.20.1"
+      }
+    }
+    user_account {
+      username = "ansible"
+      password = "ansible"
+    }
+    dns {
+      domain = "development.lab.hunt.internal"
+      servers = ["1.1.1.1"]
+    }
+    vendor_data_file_id = "local:snippets/alpine_cloud_init_vendor_data.yml"
+  }
+  # lifecycle {
+  #   ignore_changes = [
+  #     initialization
+  #   ]
+  # }
 }
 
 ####################################################################################################################################################################################

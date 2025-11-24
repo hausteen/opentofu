@@ -84,3 +84,9 @@ variable "talos_version" {
   description = "Talos image version"
   default     = "1.11.5"
 }
+
+variable "alpine_linux_version" {
+  type        = string
+  description = "Alpine Linux image version"
+  default     = "3.22.2"
+}
