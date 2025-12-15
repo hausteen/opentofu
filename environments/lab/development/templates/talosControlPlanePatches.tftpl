@@ -1,6 +1,45 @@
+cluster:
+  # allowSchedulingOnControlPlanes: false
+  apiServer:
+    admissionControl:
+      - name: PodSecurity
+        configuration:
+          defaults:
+            enforce: privileged
+  #         exemptions:
+  #           namespaces:
+  #             - kube-system
+  #             - kube-node-lease
+  #             - kube-public
+  #             - k8s
+  # coreDNS:
+  #   disabled: true
+  # discovery:
+  #   enabled: false
+  network:
+    cni:
+      name: none
+  #   dnsDomain: cluster.hunt.internal
+  #   podSubnets:
+  #     - 172.20.0.0/16
+  #   serviceSubnets:
+  #     - 172.30.0.0/16
+  proxy:
+    disabled: true
+# debug: true
 machine:
+  features:
+    hostDNS:
+      # enabled: false
+      forwardKubeDNSToHost: false
+    # kubePrism:
+    #   enabled: false
+    # kubernetesTalosAPIAccess:
+    #   enabled: false
   install:
     image: ${image}
+    # diskSelector:
+      # size: 100GB
   network:
     interfaces:
       - deviceSelector:

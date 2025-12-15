@@ -1,3 +1,21 @@
+variable "alpine_linux_version" {
+  type        = string
+  description = "Alpine Linux image version"
+  default     = "3.23.0"
+}
+
+variable "cilium_version" {
+  type        = string
+  description = "Celium CNI version"
+  default     = "1.18.4"
+}
+
+variable "kubeconfig_path" {
+  type        = string
+  description = "path to kubeconfig file"
+  default     = "~/Documents/coding/talos-k8s/binaries/kubeconfig"
+}
+
 variable "pveEndpoint" {
   type        = string
   description = "The endpoint for the Proxmox Virtual Environment API"
@@ -7,6 +25,12 @@ variable "pveApiToken" {
   type        = string
   description = "The OpenTofu token for the Proxmox Virtual Environment API"
   sensitive   = true
+}
+
+variable "pveHostnames" {
+  type        = set(string)
+  description = "The Proxmox Virtual Environment node hostnames"
+  default = ["pve1"]#, "pve2", "pve3"]
 }
 
 variable "talos_cluster_name" {
@@ -85,8 +109,8 @@ variable "talos_version" {
   default     = "1.11.5"
 }
 
-variable "alpine_linux_version" {
+variable "talosconfig_path" {
   type        = string
-  description = "Alpine Linux image version"
-  default     = "3.22.2"
+  description = "path to talosconfig file"
+  default     = "~/Documents/coding/talos-k8s/binaries/talosconfig"
 }

@@ -14,7 +14,9 @@ data "talos_image_factory_extensions_versions" "this" {
   talos_version = var.talos_version
   filters = {
     names = [
-      "qemu-guest-agent"
+      "qemu-guest-agent", # needed for proxmox
+      "siderolabs/iscsi-tools", # needed for longhorn
+      "siderolabs/util-linux-tools" # needed for longhorn
     ]
   }
 }
@@ -42,9 +44,10 @@ data "talos_image_factory_urls" "this" {
 
 # download the Talos image file to Proxmox
 resource "proxmox_virtual_environment_download_file" "talos_image" {
+  for_each = var.pveHostnames
   content_type = "iso"
   datastore_id = "local"
-  node_name    = "pve1"
+  node_name    = each.key
   file_name    = "opentofu-managed-talos-${var.talos_version}-${data.talos_image_factory_urls.this.platform}-secureboot.iso"
   url          = data.talos_image_factory_urls.this.urls.iso_secureboot
 }
@@ -72,14 +75,14 @@ resource "proxmox_virtual_environment_vm" "talos_control_plane" {
   scsi_hardware = "virtio-scsi-single"
   agent {
     enabled = true
-    timeout = "1m"
+    timeout = "2m"
   }
   tpm_state {
     datastore_id = "local-lvm"
     version = "v2.0"
   }
   cdrom {
-    file_id = proxmox_virtual_environment_download_file.talos_image.id
+    file_id = proxmox_virtual_environment_download_file.talos_image[each.value.proxmox_node].id
     interface = "scsi0"
   }
   disk {
@@ -90,13 +93,20 @@ resource "proxmox_virtual_environment_vm" "talos_control_plane" {
     ssd          = true
     size         = 100
   }
+  disk {
+    datastore_id = "local-lvm"
+    interface    = "scsi3"
+    iothread     = true
+    discard      = "on"
+    ssd          = true
+    size         = 50
+  }
   cpu {
     cores = 4
     type  = "x86-64-v2-AES"
   }
   memory {
     dedicated = 4096
-    floating = 4096
   }
   network_device {
     bridge = "vmbr1"
@@ -138,14 +148,14 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
   scsi_hardware = "virtio-scsi-single"
   agent {
     enabled = true
-    timeout = "1m"
+    timeout = "2m"
   }
   tpm_state {
     datastore_id = "local-lvm"
     version = "v2.0"
   }
   cdrom {
-    file_id = proxmox_virtual_environment_download_file.talos_image.id
+    file_id = proxmox_virtual_environment_download_file.talos_image[each.value.proxmox_node].id
     interface = "scsi0"
   }
   disk {
@@ -156,13 +166,20 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
     ssd          = true
     size         = 100
   }
+  disk {
+    datastore_id = "local-lvm"
+    interface    = "scsi3"
+    iothread     = true
+    discard      = "on"
+    ssd          = true
+    size         = 50
+  }
   cpu {
-    cores = 2
+    cores = 4
     type  = "x86-64-v2-AES"
   }
   memory {
-    dedicated = 2048
-    floating = 2048
+    dedicated = 8192
   }
   network_device {
     bridge = "vmbr1"
@@ -210,6 +227,8 @@ data "talos_machine_configuration" "control_plane" {
       }
     )
   ]
+  docs = true
+  examples = true
   depends_on = [ resource.talos_machine_secrets.this ]
 }
 
@@ -229,6 +248,8 @@ data "talos_machine_configuration" "worker" {
       }
     )
   ]
+  docs = true
+  examples = true
   depends_on = [ resource.talos_machine_secrets.this ]
 }
 
@@ -279,31 +300,79 @@ resource "talos_cluster_kubeconfig" "this" {
   depends_on           = [ resource.talos_machine_configuration_apply.worker ]
 }
 
-####################################################################################################################################################################################
-# Debian Linux - image download
+# write the kubeconfig to disk so helm provider can use it below
+resource "local_sensitive_file" "kubeconfig" {
+  content  = resource.talos_cluster_kubeconfig.this.kubeconfig_raw
+  filename = pathexpand(var.kubeconfig_path)
+  depends_on = [ resource.talos_cluster_kubeconfig.this ]
+}
 
+# write the talosconfig to disk. this is just because I want it on disk and I don't want to have to use tofu to get it manually.
+resource "local_sensitive_file" "talosconfig" {
+  content  = data.talos_client_configuration.this.talos_config
+  filename = pathexpand(var.talosconfig_path)
+  depends_on = [ data.talos_client_configuration.this ]
+}
+
+# Need to give talos time to bootstrap and get the api server up. we can't wait for a healthy cluster because it won't ever be
+# until we set up the Celium CNI. So we have to put in a time delay instead.
+resource "time_sleep" "wait" {
+  create_duration = "120s"  # This sets a delay of 120 seconds
+  depends_on = [ resource.local_sensitive_file.kubeconfig ]
+}
+
+# Set up Celium CNI.
+# Note: Helm needs working DNS in the cluster to function right.
+resource "helm_release" "cilium" {
+  name       = "cilium"
+  chart      = "cilium"
+  repository = "https://helm.cilium.io/"
+  namespace  = "kube-system"
+  version    = var.cilium_version
+  values = [
+    "ipam.mode: kubernetes",
+    "kubeProxyReplacement: true",
+    "securityContext.capabilities.ciliumAgent: [ CHOWN, KILL, NET_ADMIN, NET_RAW, IPC_LOCK, SYS_ADMIN, SYS_RESOURCE, DAC_OVERRIDE, FOWNER, SETGID, SETUID ]",
+    "securityContext.capabilities.cleanCiliumState: [ NET_ADMIN, SYS_ADMIN, SYS_RESOURCE ]",
+    "cgroup.autoMount.enabled: false",
+    "cgroup.hostRoot: /sys/fs/cgroup",
+    # "k8sServiceHost: ${var.talos_cluster_endpoint_vip}",
+    # "k8sServicePort: 6443",
+    "k8sServiceHost: localhost",
+    "k8sServicePort: 7445",
+    "gatewayAPI.enabled: true",
+    "gatewayAPI.enableAlpn: true",
+    "gatewayAPI.enableAppProtocol: true"
+  ]
+  depends_on = [ resource.time_sleep.wait ]
+}
+
+####################################################################################################################################################################################
+# Linux image (qcow2) file downloads
+
+# Debian Linux - image download
 # resource "proxmox_virtual_environment_download_file" "debian_linux_image" {
+#   for_each = var.pveHostnames
 #   content_type = "import"
 #   datastore_id = "local"
-#   node_name    = "pve1"
+#   node_name    = each.key
 #   url          = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
 #   # url          = "https://cloud.debian.org/images/cloud/trixie/20251117-2299/debian-13-genericcloud-amd64-20251117-2299.qcow2" # Working image if I need to pin it to specific version
 # }
 
-####################################################################################################################################################################################
 # Alpine Linux - image download
-
-resource "proxmox_virtual_environment_download_file" "alpine_linux_image" {
-  content_type = "import"
-  datastore_id = "local"
-  node_name    = "pve1"
-  url          = "https://dl-cdn.alpinelinux.org/alpine/v${substr(var.alpine_linux_version, 0, 4)}/releases/cloud/nocloud_alpine-${var.alpine_linux_version}-x86_64-uefi-cloudinit-r0.qcow2"
-}
+# resource "proxmox_virtual_environment_download_file" "alpine_linux_image" {
+#   for_each = var.pveHostnames
+#   content_type = "import"
+#   datastore_id = "local"
+#   node_name    = each.key
+#   url          = "https://dl-cdn.alpinelinux.org/alpine/v${substr(var.alpine_linux_version, 0, 4)}/releases/cloud/nocloud_alpine-${var.alpine_linux_version}-x86_64-uefi-cloudinit-r0.qcow2"
+# }
 
 ####################################################################################################################################################################################
 # OpenBao - virtual machine creation
 
-# Debian
+# Using Debian
 # resource "proxmox_virtual_environment_vm" "openbao1" {
 #   name = "openbao1"
 #   description = "Managed by OpenTofu."
@@ -377,78 +446,77 @@ resource "proxmox_virtual_environment_download_file" "alpine_linux_image" {
 #   # }
 # }
 
-# Alpine
-resource "proxmox_virtual_environment_vm" "openbao2" {
-  name = "openbao2"
-  description = "Managed by OpenTofu."
-  tags = ["development", "lab", "opentofu"] # Need to be in alphabetical order
-  node_name = "pve1"
-  vm_id = 101
-  on_boot = true
-  operating_system {
-    type = "l26"
-  }
-  machine = "q35"
-  bios = "ovmf"
-  efi_disk {
-    datastore_id = "local-lvm"
-    type = "4m"
-  }
-  scsi_hardware = "virtio-scsi-single"
-  agent {
-    enabled = true
-    timeout = "2m"
-  }
-  tpm_state {
-    datastore_id = "local-lvm"
-    version = "v2.0"
-  }
-  disk {
-    datastore_id = "local-lvm"
-    import_from  = proxmox_virtual_environment_download_file.alpine_linux_image.id
-    interface    = "scsi0"
-    iothread     = true
-    discard      = "on"
-    ssd          = true
-    size         = 10
-  }
-  cpu {
-    cores = 2
-    type  = "x86-64-v2-AES"
-  }
-  memory {
-    dedicated = 2048
-    floating = 2048
-  }
-  network_device {
-    bridge = "vmbr1"
-    vlan_id = 20
-  }
-  boot_order = ["scsi0"]
-  initialization {
-    interface = "scsi1"
-    ip_config {
-      ipv4 {
-        address = "192.168.20.51/24"
-        gateway = "192.168.20.1"
-      }
-    }
-    user_account {
-      username = "ansible"
-      password = "ansible"
-    }
-    dns {
-      domain = "development.lab.hunt.internal"
-      servers = ["1.1.1.1"]
-    }
-    vendor_data_file_id = "local:snippets/alpine_cloud_init_vendor_data.yml"
-  }
-  # lifecycle {
-  #   ignore_changes = [
-  #     initialization
-  #   ]
-  # }
-}
+# Using Alpine
+# resource "proxmox_virtual_environment_vm" "openbao" {
+#   name = "openbao"
+#   description = "Managed by OpenTofu."
+#   tags = ["development", "lab", "opentofu"] # Need to be in alphabetical order
+#   node_name = "pve1"
+#   vm_id = 100
+#   on_boot = true
+#   operating_system {
+#     type = "l26"
+#   }
+#   machine = "q35"
+#   bios = "ovmf"
+#   efi_disk {
+#     datastore_id = "local-lvm"
+#     type = "4m"
+#   }
+#   scsi_hardware = "virtio-scsi-single"
+#   agent {
+#     enabled = true
+#     timeout = "2m"
+#   }
+#   tpm_state {
+#     datastore_id = "local-lvm"
+#     version = "v2.0"
+#   }
+#   disk {
+#     datastore_id = "local-lvm"
+#     import_from  = proxmox_virtual_environment_download_file.alpine_linux_image.id
+#     interface    = "scsi0"
+#     iothread     = true
+#     discard      = "on"
+#     ssd          = true
+#     size         = 10
+#   }
+#   cpu {
+#     cores = 1
+#     type  = "x86-64-v2-AES"
+#   }
+#   memory {
+#     dedicated = 1024
+#     floating = 1024
+#   }
+#   network_device {
+#     bridge = "vmbr1"
+#     vlan_id = 20
+#   }
+#   boot_order = ["scsi0"]
+#   initialization {
+#     interface = "scsi1"
+#     ip_config {
+#       ipv4 {
+#         address = "192.168.20.10/24"
+#         gateway = "192.168.20.1"
+#       }
+#     }
+#     user_account {
+#       username = "ansible"
+#     }
+#     dns {
+#       domain = "development.lab.hunt.internal"
+#       servers = ["1.1.1.1"]
+#     }
+#     vendor_data_file_id = "local:snippets/alpine_cloud_init_vendor_data.yml"
+#   }
+#   # lifecycle {
+#   #   ignore_changes = [
+#   #     initialization
+#   #   ]
+#   # }
+# }
 
 ####################################################################################################################################################################################
 #
