@@ -1,11 +1,11 @@
 cluster:
   # allowSchedulingOnControlPlanes: false
-  apiServer:
-    admissionControl:
-      - name: PodSecurity
-        configuration:
-          defaults:
-            enforce: privileged
+  # apiServer:
+  #   admissionControl:
+  #     - name: PodSecurity
+  #       configuration:
+  #         defaults:
+  #           enforce: privileged
   #         exemptions:
   #           namespaces:
   #             - kube-system
@@ -26,7 +26,7 @@ cluster:
   #     - 172.30.0.0/16
   proxy:
     disabled: true
-# debug: true
+debug: true
 machine:
   features:
     hostDNS:

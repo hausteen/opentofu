@@ -204,6 +204,25 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
 ####################################################################################################################################################################################
 # Talos Linux - install and cluster creation
 
+
+
+# Set up Celium CNI.
+# Note: Helm needs working DNS in the cluster to function right.
+data "helm_template" "cilium" {
+  name         = "cilium"
+  namespace    = "kube-system"
+  repository   = "https://helm.cilium.io/"
+  chart        = "cilium"
+  version      = var.cilium_version
+  kube_version = "v1.34.0"
+  values       = ["${file("templates/cilium-values.yaml")}"]
+  include_crds = true
+}
+
+
+
+
+
 # Create the secrets for the Talos cluster
 # Like talosctl gen secrets -o secrets.yaml
 resource "talos_machine_secrets" "this" {
@@ -220,12 +239,21 @@ data "talos_machine_configuration" "control_plane" {
   talos_version    = var.talos_version
   config_patches   = [
     templatefile(
-      "templates/talosControlPlanePatches.tftpl",
-      {
+      "templates/talosControlPlanePatches.tftpl", {
         image = data.talos_image_factory_urls.this.urls.installer_secureboot,
         vip   = var.talos_cluster_endpoint_vip
-      }
-    )
+      }),
+      yamlencode({
+        cluster = {
+          inlineManifests = [{
+            name = "cilium"
+            contents = join("---\n", [
+              data.helm_template.cilium.manifest
+            ]),
+          }],
+        },
+      }),
+    templatefile("templates/cilium-l2.yaml", {}),
   ]
   docs = true
   examples = true
@@ -321,31 +349,30 @@ resource "time_sleep" "wait" {
   depends_on = [ resource.local_sensitive_file.kubeconfig ]
 }
 
-# Set up Celium CNI.
-# Note: Helm needs working DNS in the cluster to function right.
-resource "helm_release" "cilium" {
-  name       = "cilium"
-  chart      = "cilium"
-  repository = "https://helm.cilium.io/"
-  namespace  = "kube-system"
-  version    = var.cilium_version
-  values = [
-    "ipam.mode: kubernetes",
-    "kubeProxyReplacement: true",
-    "securityContext.capabilities.ciliumAgent: [ CHOWN, KILL, NET_ADMIN, NET_RAW, IPC_LOCK, SYS_ADMIN, SYS_RESOURCE, DAC_OVERRIDE, FOWNER, SETGID, SETUID ]",
-    "securityContext.capabilities.cleanCiliumState: [ NET_ADMIN, SYS_ADMIN, SYS_RESOURCE ]",
-    "cgroup.autoMount.enabled: false",
-    "cgroup.hostRoot: /sys/fs/cgroup",
-    # "k8sServiceHost: ${var.talos_cluster_endpoint_vip}",
-    # "k8sServicePort: 6443",
-    "k8sServiceHost: localhost",
-    "k8sServicePort: 7445",
-    "gatewayAPI.enabled: true",
-    "gatewayAPI.enableAlpn: true",
-    "gatewayAPI.enableAppProtocol: true"
-  ]
-  depends_on = [ resource.time_sleep.wait ]
-}
+
+# resource "helm_release" "cilium" {
+#   name       = "cilium"
+#   chart      = "cilium"
+#   repository = "https://helm.cilium.io/"
+#   namespace  = "kube-system"
+#   version    = var.cilium_version
+#   values = [
+#     "ipam.mode: kubernetes",
+#     "kubeProxyReplacement: true",
+#     "securityContext.capabilities.ciliumAgent: [ CHOWN, KILL, NET_ADMIN, NET_RAW, IPC_LOCK, SYS_ADMIN, SYS_RESOURCE, DAC_OVERRIDE, FOWNER, SETGID, SETUID ]",
+#     "securityContext.capabilities.cleanCiliumState: [ NET_ADMIN, SYS_ADMIN, SYS_RESOURCE ]",
+#     "cgroup.autoMount.enabled: false",
+#     "cgroup.hostRoot: /sys/fs/cgroup",
+#     # "k8sServiceHost: ${var.talos_cluster_endpoint_vip}",
+#     # "k8sServicePort: 6443",
+#     "k8sServiceHost: localhost",
+#     "k8sServicePort: 7445",
+#     # "gatewayAPI.enabled: true",
+#     # "gatewayAPI.enableAlpn: true",
+#     # "gatewayAPI.enableAppProtocol: true"
+#   ]
+#   depends_on = [ resource.time_sleep.wait ]
+# }
 
 ####################################################################################################################################################################################
 # Linux image (qcow2) file downloads
