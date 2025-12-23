@@ -35,7 +35,7 @@ resource "talos_image_factory_schematic" "this" {
   depends_on = [ data.talos_image_factory_extensions_versions.this ]
 }
 
-# generates URLs for different assets supported by the talos image factory
+# generates urls for different assets supported by the talos image factory
 data "talos_image_factory_urls" "this" {
   talos_version = var.talos_linux_version
   schematic_id  = talos_image_factory_schematic.this.id
@@ -212,7 +212,7 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
 data "helm_template" "cilium" {
   chart        = "cilium"
   include_crds = true
-  kube_version = "v1.34.0" # I have to specify this for now. Should be resolved once the opentofu helm provider pulls in the patch. Then I can delete this line. https://github.com/helm/helm/pull/31512
+  kube_version = "v1.34.0" # i have to specify this for now. should be resolved once the opentofu helm provider pulls in the patch. then i can delete this line. https://github.com/helm/helm/pull/31512
   name         = "cilium"
   namespace    = "kube-system"
   repository   = "https://helm.cilium.io/"
@@ -236,7 +236,7 @@ resource "talos_machine_secrets" "this" {
 }
 
 # get the machine configuration for the control plane nodes
-# like talosctl gen config --with-secrets secrets.yaml <CLUSTER_NAME> https://<CLUSTER_ENDPOINT>:6443 --install-image factory.talos.dev/<nocloud>-installer-<secureboot>/<hash>:v<version>
+# like talosctl gen config --with-secrets secrets.yaml <cluster_name> https://<cluster_endpoint>:6443 --install-image factory.talos.dev/<nocloud>-installer-<secureboot>/<hash>:v<version>
 data "talos_machine_configuration" "control_plane" {
   machine_type     = "controlplane"
   cluster_name     = var.talos_cluster_name
@@ -271,7 +271,7 @@ data "talos_machine_configuration" "control_plane" {
 }
 
 # get the machine configuration for the worker nodes
-# like talosctl gen config --with-secrets secrets.yaml <CLUSTER_NAME> https://<CLUSTER_ENDPOINT>:6443 --install-image factory.talos.dev/<nocloud>-installer-<secureboot>/<hash>:v<version>
+# like talosctl gen config --with-secrets secrets.yaml <custer_name> https://<cluster_endpoint>:6443 --install-image factory.talos.dev/<nocloud>-installer-<secureboot>/<hash>:v<version>
 data "talos_machine_configuration" "worker" {
   machine_type     = "worker"
   cluster_name     = var.talos_cluster_name
@@ -294,8 +294,8 @@ data "talos_machine_configuration" "worker" {
 
 # use this to get the talosconfig file
 # set the nodes and endpoints in the talosconfig file
-# like talosctl config endpoint <CONTROL_PLANE_IPs / CLUSTER_ENDPOINT> --talosconfig talosconfig
-# like talosctl config node <CONTROL_PLANE_IPs> --talosconfig talosconfig
+# like talosctl config endpoint <control_plane_ip / cluster_endpoint> --talosconfig talosconfig
+# like talosctl config node <control_plane_ip> --talosconfig talosconfig
 data "talos_client_configuration" "this" {
   cluster_name         = var.talos_cluster_name
   client_configuration = talos_machine_secrets.this.client_configuration
@@ -305,7 +305,7 @@ data "talos_client_configuration" "this" {
 }
 
 # apply the control_plane machine configuration to the control plane nodes
-# like talosctl apply-config --insecure --nodes $CONTROL_PLANE_IPs --file controlplane.yaml
+# like talosctl apply-config --insecure --nodes $control_plane_ip --file controlplane.yaml
 resource "talos_machine_configuration_apply" "control_plane" {
   client_configuration        = talos_machine_secrets.this.client_configuration
   machine_configuration_input = data.talos_machine_configuration.control_plane.machine_configuration
@@ -327,7 +327,7 @@ resource "talos_machine_configuration_apply" "control_plane" {
 }
 
 # bootstrap the talos cluster by selecting only 1 control plane node to bootstrap
-# like talosctl bootstrap --nodes $CONTROL_PLANE_IP --talosconfig talosconfig
+# like talosctl bootstrap --nodes $control_plane_ip --talosconfig talosconfig
 resource "talos_machine_bootstrap" "this" {
   client_configuration = talos_machine_secrets.this.client_configuration
   node                 = [ for k, v in var.talos_node_data.control_planes: v.ip ][0]
@@ -335,7 +335,7 @@ resource "talos_machine_bootstrap" "this" {
 }
 
 # apply the worker machine configuration to the worker nodes
-# like talosctl apply-config --insecure --nodes WORKER_IPs --file worker.yaml
+# like talosctl apply-config --insecure --nodes worker_ips --file worker.yaml
 resource "talos_machine_configuration_apply" "worker" {
   client_configuration        = talos_machine_secrets.this.client_configuration
   machine_configuration_input = data.talos_machine_configuration.worker.machine_configuration
@@ -358,7 +358,7 @@ resource "local_sensitive_file" "kubeconfig" {
   depends_on = [ resource.talos_cluster_kubeconfig.this ]
 }
 
-# write the talosconfig to disk. this is just because I want it on disk and I don't want to have to use tofu to get it manually.
+# write the talosconfig to disk. this is just because i want it on disk and i don't want to have to use tofu to get it manually.
 resource "local_sensitive_file" "talosconfig" {
   content    = data.talos_client_configuration.this.talos_config
   filename   = pathexpand(var.talos_talosconfig_path)
@@ -375,7 +375,7 @@ resource "local_sensitive_file" "talosconfig" {
 #   datastore_id = "local"
 #   node_name    = each.key
 #   url          = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
-#   # url          = "https://cloud.debian.org/images/cloud/trixie/20251117-2299/debian-13-genericcloud-amd64-20251117-2299.qcow2" # Working image if I need to pin it to specific version
+#   # url          = "https://cloud.debian.org/images/cloud/trixie/20251117-2299/debian-13-genericcloud-amd64-20251117-2299.qcow2" # working image if i need to pin it to specific version
 # }
 
 # alpine linux

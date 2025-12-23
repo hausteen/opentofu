@@ -1,3 +1,3 @@
-# Opentofu
+# opentofu
 
-Opentofu automation for my home and lab
+opentofu automation for my home and lab

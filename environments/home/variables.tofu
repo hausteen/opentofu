@@ -60,7 +60,7 @@ variable "talos_cluster_name" {
   type        = string
   description = "talos cluster name"
   default     = "home"
-  validation { # this is only because I want it to be lowercase only
+  validation { # this is only because i want it to be lowercase only
     condition     = var.talos_cluster_name == lower(var.talos_cluster_name)
     error_message = "cluster name must be lowercase"
   }
@@ -68,24 +68,24 @@ variable "talos_cluster_name" {
 
 variable "talos_cluster_endpoint_vip" {
   type        = string
-  description = "Talos cluster endpoint shared virtual ip"
+  description = "talos cluster endpoint shared virtual ip"
   default     = "192.168.20.140"
 }
 
 variable "talos_default_gateway" {
   type        = string
-  description = "Talos cluster default gateway"
+  description = "talos cluster default gateway"
   default     = "192.168.20.1"
 }
 
 variable "talos_linux_version" {
   type        = string
-  description = "Talos image version"
+  description = "talos image version"
   default     = "1.11.6"
 }
 
 variable "talos_node_data" {
-  description = "A map of talos node data"
+  description = "a map of talos node data"
   type = object({
     control_planes = map(object({
       vm_id        = number
@@ -99,7 +99,7 @@ variable "talos_node_data" {
     }))
   })
   default = {
-    control_planes = { # proxmox restriction: these keys cannot have an underscore in them. Use camel case instead
+    control_planes = { # proxmox restriction: these keys cannot have an underscore in them. use camel case instead
       talosControlPlane00 = {
         vm_id        = 110,
         ip           = "192.168.20.150",
@@ -116,7 +116,7 @@ variable "talos_node_data" {
         proxmox_node = "pve1"
       }
     }
-    workers = { # proxmox restriction: these keys cannot have an underscore in them. Use camel case instead
+    workers = { # proxmox restriction: these keys cannot have an underscore in them. use camel case instead
       talosWorker00 = {
         vm_id        = 120,
         ip           = "192.168.20.160",
