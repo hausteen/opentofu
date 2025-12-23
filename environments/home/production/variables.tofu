@@ -1,10 +1,10 @@
 variable "pveEndpoint" {
   type        = string
-  description = "The endpoint for the Proxmox Virtual Environment API"
+  description = "the endpoint for the Proxmox Virtual Environment API"
 }
 
 variable "pveApiToken" {
   type        = string
-  description = "The OpenTofu token for the Proxmox Virtual Environment API"
+  description = "the opentofu token for the Proxmox Virtual Environment API"
   sensitive   = true
 }

@@ -16,21 +16,11 @@ terraform {
       source = "hashicorp/local"
       version = "2.6.1"
     }
-    time = {
-      source = "hashicorp/time"
-      version = "0.13.1"
-    }
   }
 }
 
 provider "proxmox" {
-  endpoint  = var.pve_endpoint
+  endpoint  = var.pve_api_endpoint
   api_token = var.pve_api_token
   insecure = true
-}
-
-provider "helm" {
-  kubernetes = {
-    config_path = var.kubeconfig_path
-  }
 }

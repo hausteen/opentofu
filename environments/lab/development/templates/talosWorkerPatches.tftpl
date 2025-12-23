@@ -1,32 +1,28 @@
 cluster:
-  # coreDNS:
-  #   disabled: true
-  # discovery:
-  #   enabled: false
+  discovery:
+    enabled: false
   network:
     cni:
       name: none
-    # dnsDomain: cluster.hunt.internal
-    # podSubnets:
-    #   - 172.20.0.0/16
-    # serviceSubnets:
-    #   - 172.30.0.0/16
+    dnsDomain: ${kubernetes_cluster_internal_dns_domain}
+    podSubnets:
+      - 172.30.0.0/16
+    serviceSubnets:
+      - 172.20.0.0/16
   proxy:
     disabled: true
-# debug: true
+# debug: true # talos linux debug logging
 machine:
   features:
     hostDNS:
-      # enabled: false
+      enabled: false
       forwardKubeDNSToHost: false
-    # kubePrism:
-    #   enabled: false
-    # kubernetesTalosAPIAccess:
-    #   enabled: false
+    kubePrism:
+      enabled: false
+    kubernetesTalosAPIAccess:
+      enabled: false
   install:
-    image: ${image}
-    # diskSelector:
-    #   size: 100GB
+    image: ${talos_image}
   time:
     servers:
       - time.cloudflare.com
