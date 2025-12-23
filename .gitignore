@@ -19,3 +19,6 @@
 
 # crash log files
 **/crash*
+
+# my tofu plan file
+**/plan
