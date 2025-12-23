@@ -245,7 +245,7 @@ data "talos_machine_configuration" "control_plane" {
   talos_version    = var.talos_linux_version
   config_patches   = [
     templatefile(
-      "templates/talosControlPlanePatches.tftpl",
+      "templates/talos_control_plane_patches.tftpl",
       {
         kubernetes_cluster_internal_dns_domain = var.kubernetes_cluster_internal_dns_domain
         talos_cluster_endpoint_vip             = var.talos_cluster_endpoint_vip
@@ -280,7 +280,7 @@ data "talos_machine_configuration" "worker" {
   talos_version    = var.talos_linux_version
   config_patches   = [
     templatefile(
-      "templates/talosWorkerPatches.tftpl",
+      "templates/talos_worker_patches.tftpl",
       {
         kubernetes_cluster_internal_dns_domain = var.kubernetes_cluster_internal_dns_domain
         talos_image                            = data.talos_image_factory_urls.this.urls.installer_secureboot
