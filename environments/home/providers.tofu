@@ -1,5 +1,17 @@
 terraform {
   required_providers {
+    helm = {
+      source = "hashicorp/helm"
+      version = "3.1.1"
+    }
+    kustomization = {
+      source = "kbst/kustomization"
+      version = "0.9.7"
+    }
+    local = {
+      source = "hashicorp/local"
+      version = "2.6.1"
+    }
     proxmox = {
       source = "bpg/proxmox"
       version = "0.89.1"
@@ -8,15 +20,11 @@ terraform {
       source = "siderolabs/talos"
       version = "0.9.0"
     }
-    helm = {
-      source = "hashicorp/helm"
-      version = "3.1.1"
-    }
-    local = {
-      source = "hashicorp/local"
-      version = "2.6.1"
-    }
   }
+}
+
+provider "kustomization" {
+  kubeconfig_raw = resource.talos_cluster_kubeconfig.this.kubeconfig_raw
 }
 
 provider "proxmox" {

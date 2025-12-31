@@ -23,6 +23,15 @@ machine:
       enabled: false
   install:
     image: ${talos_image}
+  kubelet:
+    extraMounts:
+      - destination: /var/mnt/longhorn
+        type: bind
+        source: /var/mnt/longhorn
+        options:
+          - bind
+          - rshared
+          - rw
   time:
     servers:
       - time.cloudflare.com

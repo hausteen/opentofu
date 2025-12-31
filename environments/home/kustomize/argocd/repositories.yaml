@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-of-apps
+spec:
+  project: default
+  source:
+    directory:
+      recurse: true
+    path: .
+    repoURL: https://github.com/hausteen/kubernetes_applications.git
+    targetRevision: HEAD
+  destination:
+    namespace: app-of-apps
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+    syncOptions:
+      - CreateNamespace=true

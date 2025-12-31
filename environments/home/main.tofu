@@ -97,14 +97,6 @@ resource "proxmox_virtual_environment_vm" "talos_control_plane" {
     ssd          = true
     size         = 100
   }
-  disk {
-    datastore_id = "local-lvm"
-    interface    = "scsi3"
-    iothread     = true
-    discard      = "on"
-    ssd          = true
-    size         = 50
-  }
   cpu {
     cores = 4
     type  = "x86-64-v2-AES"
@@ -279,6 +271,7 @@ data "talos_machine_configuration" "worker" {
   machine_secrets  = talos_machine_secrets.this.machine_secrets
   talos_version    = var.talos_linux_version
   config_patches   = [
+    templatefile("templates/talos_volume_config_patch.tftpl", {}),
     templatefile(
       "templates/talos_worker_patches.tftpl",
       {
@@ -365,6 +358,45 @@ resource "local_sensitive_file" "talosconfig" {
   depends_on = [ data.talos_client_configuration.this ]
 }
 
+# wait for the whole cluster to be healthy before continuing
+data "talos_cluster_health" "this" {
+  client_configuration = talos_machine_secrets.this.client_configuration
+  endpoints            = [ for k, v in var.talos_node_data.control_planes: v.ip ]
+  control_plane_nodes  = [ for k, v in var.talos_node_data.control_planes: v.ip ]
+  worker_nodes         = [ for k, v in var.talos_node_data.workers: v.ip ]
+  depends_on           = [ resource.talos_machine_configuration_apply.worker ]
+}
+
+####################################################################################################################################################################################
+# install argocd (stable branch) on the kubernetes cluster
+
+# build the manifest files using kustomize
+data "kustomization_build" "argocd" {
+  path       = "kustomize/argocd/"
+  depends_on = [ data.talos_cluster_health.this ]
+}
+
+# deploy priority 0 items first
+resource "kustomization_resource" "argocd-p0" {
+  for_each   = data.kustomization_build.argocd.ids_prio[0]
+  manifest   = data.kustomization_build.argocd.manifests[each.value]
+  depends_on = [ data.kustomization_build.argocd ]
+}
+
+# deploy priority 1 items next
+resource "kustomization_resource" "argocd-p1" {
+  for_each   = data.kustomization_build.argocd.ids_prio[1]
+  manifest   = data.kustomization_build.argocd.manifests[each.value]
+  depends_on = [ resource.kustomization_resource.argocd-p0 ]
+}
+
+# deploy priority 2 items last
+resource "kustomization_resource" "argocd-p2" {
+  for_each   = data.kustomization_build.argocd.ids_prio[2]
+  manifest   = data.kustomization_build.argocd.manifests[each.value]
+  depends_on = [ resource.kustomization_resource.argocd-p1 ]
+}
+
 ####################################################################################################################################################################################
 # linux image (qcow2) file downloads
 
@@ -386,144 +418,3 @@ resource "local_sensitive_file" "talosconfig" {
 #   node_name    = each.key
 #   url          = "https://dl-cdn.alpinelinux.org/alpine/v${substr(var.alpine_linux_version, 0, 4)}/releases/cloud/nocloud_alpine-${var.alpine_linux_version}-x86_64-uefi-cloudinit-r0.qcow2"
 # }
-
-####################################################################################################################################################################################
-# openbao - virtual machine creation
-
-# using debian
-# resource "proxmox_virtual_environment_vm" "openbao" {
-#   name          = "openbao"
-#   description   = ""
-#   tags          = ["lab", "managed_by_opentofu", "secrets_management"] # need to be in alphabetical order
-#   node_name     = "pve1"
-#   vm_id         = 100
-#   on_boot       = true
-#   machine       = "q35"
-#   bios          = "ovmf"
-#   scsi_hardware = "virtio-scsi-single"
-#   boot_order    = ["scsi0"]
-#   operating_system {
-#     type = "l26"
-#   }
-#   efi_disk {
-#     datastore_id      = "local-lvm"
-#     pre_enrolled_keys = true
-#     type              = "4m"
-#   }
-#   agent {
-#     enabled = true
-#     timeout = "1m"
-#   }
-#   tpm_state {
-#     datastore_id = "local-lvm"
-#     version      = "v2.0"
-#   }
-#   disk {
-#     datastore_id = "local-lvm"
-#     import_from  = proxmox_virtual_environment_download_file.debian_linux_image.id
-#     interface    = "scsi0"
-#     iothread     = true
-#     discard      = "on"
-#     ssd          = true
-#     size         = 10
-#   }
-#   cpu {
-#     cores = 2
-#     type  = "x86-64-v2-AES"
-#   }
-#   memory {
-#     dedicated = 2048
-#     floating  = 2048
-#   }
-#   network_device {
-#     bridge  = "vmbr1"
-#     vlan_id = 20
-#   }
-#   initialization {
-#     interface           = "scsi1"
-#     vendor_data_file_id = "local:snippets/debian_cloud_init_vendor_data.yml"
-#     ip_config {
-#       ipv4 {
-#         address = "192.168.20.50/24"
-#         gateway = "192.168.20.1"
-#       }
-#     }
-#     user_account {
-#       username = "debian"
-#     }
-#     dns {
-#       domain  = ""
-#       servers = [""]
-#     }
-#   }
-# }
-
-# using alpine
-# resource "proxmox_virtual_environment_vm" "openbao" {
-#   name          = "openbao"
-#   description   = ""
-#   tags          = ["lab", "managed_by_opentofu", "secrets_management"] # need to be in alphabetical order
-#   node_name     = "pve1"
-#   vm_id         = 100
-#   on_boot       = true
-#   machine       = "q35"
-#   bios          = "ovmf"
-#   scsi_hardware = "virtio-scsi-single"
-#   boot_order    = ["scsi0"]
-#   operating_system {
-#     type = "l26"
-#   }
-#   efi_disk {
-#     datastore_id = "local-lvm"
-#     type         = "4m"
-#   }
-#   agent {
-#     enabled = true
-#     timeout = "2m"
-#   }
-#   tpm_state {
-#     datastore_id = "local-lvm"
-#     version      = "v2.0"
-#   }
-#   disk {
-#     datastore_id = "local-lvm"
-#     import_from  = proxmox_virtual_environment_download_file.alpine_linux_image.id
-#     interface    = "scsi0"
-#     iothread     = true
-#     discard      = "on"
-#     ssd          = true
-#     size         = 10
-#   }
-#   cpu {
-#     cores = 1
-#     type  = "x86-64-v2-AES"
-#   }
-#   memory {
-#     dedicated = 1024
-#     floating  = 1024
-#   }
-#   network_device {
-#     bridge  = "vmbr1"
-#     vlan_id = 20
-#   }
-#   initialization {
-#     interface           = "scsi1"
-#     vendor_data_file_id = "local:snippets/alpine_cloud_init_vendor_data.yml"
-#     ip_config {
-#       ipv4 {
-#         address = "192.168.20.50/24"
-#         gateway = "192.168.20.1"
-#       }
-#     }
-#     user_account {
-#       username = "alpine"
-#     }
-#     dns {
-#       domain  = ""
-#       servers = [""]
-#     }
-#   }
-# }
-
-####################################################################################################################################################################################
-#
