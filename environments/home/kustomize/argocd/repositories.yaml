@@ -5,14 +5,14 @@ metadata:
 spec:
   project: default
   source:
-    directory:
-      recurse: true
-    path: .
     repoURL: https://github.com/hausteen/kubernetes_applications.git
     targetRevision: HEAD
+    path: .
+    directory:
+      recurse: true
   destination:
-    namespace: app-of-apps
     server: https://kubernetes.default.svc
+    namespace: app-of-apps
   syncPolicy:
     automated:
       enabled: true
