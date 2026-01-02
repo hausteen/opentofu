@@ -28,10 +28,18 @@ ipam:
   # this needs to stay 'kubernetes' since using talos linux.
   # talos assigns the pod and service cidrs to the nodes.
   # there's no way to disable that. so we can't use cilium's cluster-pool.
+k8sClientRateLimit:
+  burst: 100
+  qps: 50 # services * (1 / leaseRenewDeadline)
 k8sServiceHost: ${kubernetes_service_host} # set this to the kubernetes api vip
 k8sServicePort: 6443 # set this to the kubernetes api port
 kubeProxyReplacement: true
 kubeProxyReplacementHealthzBindAddr: 0.0.0.0:10256 # must stay this ip and port
+l2announcements:
+  enabled: true
+  leaseDuration: 8s
+  leaseRenewDeadline: 4s
+  leaseRetryPeriod: 2s
 l7Proxy: false
 securityContext:
   capabilities:
