@@ -23,6 +23,12 @@ terraform {
   }
 }
 
+provider "helm" {
+  kubernetes = {
+    config_path = var.kubernetes_kubeconfig_path
+  }
+}
+
 provider "kustomization" {
   kubeconfig_raw = resource.talos_cluster_kubeconfig.this.kubeconfig_raw
 }

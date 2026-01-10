@@ -368,33 +368,36 @@ data "talos_cluster_health" "this" {
 }
 
 ####################################################################################################################################################################################
-# install argocd (stable branch) on the kubernetes cluster
+# install argocd on the kubernetes cluster so gitops can take over
 
-# build the manifest files using kustomize
+# install argocd
+resource "helm_release" "argocd" {
+  chart            = "argo-cd"
+  name             = "argocd"
+  namespace        = "argocd"
+  repository       = "https://argoproj.github.io/argo-helm"
+  version          = var.argocd_helm_version
+  create_namespace = true
+  values           = [ templatefile("templates/argocd_values.tftpl", {}) ]
+  depends_on       = [ data.talos_cluster_health.this ]
+}
+
+# kustomize build the argocd app of apps application
 data "kustomization_build" "argocd" {
   path       = "kustomize/argocd/"
-  depends_on = [ data.talos_cluster_health.this ]
+  depends_on = [ resource.helm_release.argocd ]
 }
 
-# deploy priority 0 items first
-resource "kustomization_resource" "argocd-p0" {
-  for_each   = data.kustomization_build.argocd.ids_prio[0]
-  manifest   = data.kustomization_build.argocd.manifests[each.value]
-  depends_on = [ data.kustomization_build.argocd ]
-}
-
-# deploy priority 1 items next
+# kustomize deploy (priority 1) the argocd app of apps application
+# https://search.opentofu.org/provider/kbst/kustomization/latest/docs/datasources/build#attribute-reference
+  # ids_prio - List of Kustomize resource IDs grouped into three sets.
+  #     ids_prio[0]: Kind: Namespace and Kind: CustomResourceDefinition
+  #     ids_prio[1]: All Kinds not in ids_prio[0] or ids_prio[2]
+  #     ids_prio[2]: Kind: MutatingWebhookConfiguration and Kind: ValidatingWebhookConfiguration
 resource "kustomization_resource" "argocd-p1" {
   for_each   = data.kustomization_build.argocd.ids_prio[1]
   manifest   = data.kustomization_build.argocd.manifests[each.value]
-  depends_on = [ resource.kustomization_resource.argocd-p0 ]
-}
-
-# deploy priority 2 items last
-resource "kustomization_resource" "argocd-p2" {
-  for_each   = data.kustomization_build.argocd.ids_prio[2]
-  manifest   = data.kustomization_build.argocd.manifests[each.value]
-  depends_on = [ resource.kustomization_resource.argocd-p1 ]
+  depends_on = [ data.kustomization_build.argocd ]
 }
 
 ####################################################################################################################################################################################

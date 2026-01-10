@@ -1,7 +1,13 @@
-variable "alpine_linux_version" {
+# variable "alpine_linux_version" {
+#   type        = string
+#   description = "alpine linux image version"
+#   default     = "3.23.2"
+# }
+
+variable "argocd_helm_version" {
   type        = string
-  description = "alpine linux image version"
-  default     = "3.23.2"
+  description = "argocd helm image version"
+  default     = "9.2.4"
 }
 
 variable "kubernetes_api_endpoint" {
@@ -81,7 +87,7 @@ variable "talos_default_gateway" {
 variable "talos_linux_version" {
   type        = string
   description = "talos image version"
-  default     = "1.11.6"
+  default     = "1.12.1"
 }
 
 variable "talos_node_data" {

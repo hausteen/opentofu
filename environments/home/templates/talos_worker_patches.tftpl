@@ -3,15 +3,14 @@ cluster:
     enabled: false
   network:
     cni:
-      name: none
+      name: none # needed for cilium
     dnsDomain: ${kubernetes_cluster_internal_dns_domain}
     podSubnets:
       - 172.30.0.0/16
     serviceSubnets:
       - 172.20.0.0/16
   proxy:
-    disabled: true
-# debug: true # talos linux debug logging
+    disabled: true # needed for cilium
 machine:
   features:
     hostDNS:
@@ -23,7 +22,7 @@ machine:
       enabled: false
   install:
     image: ${talos_image}
-  kubelet:
+  kubelet: # needed for longhorn
     extraMounts:
       - destination: /var/mnt/longhorn
         type: bind
