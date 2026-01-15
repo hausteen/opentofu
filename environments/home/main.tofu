@@ -212,9 +212,8 @@ data "helm_template" "cilium" {
     templatefile(
       "templates/cilium_values.tftpl",
       {
-        kubernetes_cluster_internal_dns_domain = var.kubernetes_cluster_internal_dns_domain
-        kubernetes_cluster_name                = var.kubernetes_cluster_name
-        kubernetes_service_host                = var.kubernetes_api_endpoint
+        kubernetes_cluster_name = var.kubernetes_cluster_name
+        kubernetes_service_host = var.kubernetes_api_endpoint
       }
     )
   ]
@@ -239,9 +238,8 @@ data "talos_machine_configuration" "control_plane" {
     templatefile(
       "templates/talos_control_plane_patches.tftpl",
       {
-        kubernetes_cluster_internal_dns_domain = var.kubernetes_cluster_internal_dns_domain
-        talos_cluster_endpoint_vip             = var.talos_cluster_endpoint_vip
-        talos_image                            = data.talos_image_factory_urls.this.urls.installer_secureboot
+        talos_cluster_endpoint_vip = var.talos_cluster_endpoint_vip
+        talos_image                = data.talos_image_factory_urls.this.urls.installer_secureboot
       }
     ),
     yamlencode(
@@ -275,8 +273,7 @@ data "talos_machine_configuration" "worker" {
     templatefile(
       "templates/talos_worker_patches.tftpl",
       {
-        kubernetes_cluster_internal_dns_domain = var.kubernetes_cluster_internal_dns_domain
-        talos_image                            = data.talos_image_factory_urls.this.urls.installer_secureboot
+        talos_image = data.talos_image_factory_urls.this.urls.installer_secureboot
       }
     )
   ]
@@ -370,34 +367,62 @@ data "talos_cluster_health" "this" {
 ####################################################################################################################################################################################
 # install argocd on the kubernetes cluster so gitops can take over
 
-# install argocd
-resource "helm_release" "argocd" {
-  chart            = "argo-cd"
-  name             = "argocd"
-  namespace        = "argocd"
-  repository       = "https://argoproj.github.io/argo-helm"
-  version          = var.argocd_helm_version
-  create_namespace = true
-  values           = [ templatefile("templates/argocd_values.tftpl", {}) ]
-  depends_on       = [ data.talos_cluster_health.this ]
+# create the argocd namespace
+# kustomize build argocd namespace
+# do not put a depends_on line in this data block or else tofu will complain about
+# not knowing the identifiers before runtime.
+data "kustomization_build" "argocd_namespace" {
+  path = "kustomize/argocdNamespace/"
 }
 
-# kustomize build the argocd app of apps application
-data "kustomization_build" "argocd" {
-  path       = "kustomize/argocd/"
-  depends_on = [ resource.helm_release.argocd ]
-}
-
-# kustomize deploy (priority 1) the argocd app of apps application
+# kustomize deploy argocd namespace
 # https://search.opentofu.org/provider/kbst/kustomization/latest/docs/datasources/build#attribute-reference
   # ids_prio - List of Kustomize resource IDs grouped into three sets.
   #     ids_prio[0]: Kind: Namespace and Kind: CustomResourceDefinition
   #     ids_prio[1]: All Kinds not in ids_prio[0] or ids_prio[2]
   #     ids_prio[2]: Kind: MutatingWebhookConfiguration and Kind: ValidatingWebhookConfiguration
-resource "kustomization_resource" "argocd-p1" {
+resource "kustomization_resource" "argocd_namespace_p0" {
+  for_each   = data.kustomization_build.argocd_namespace.ids_prio[0]
+  manifest   = data.kustomization_build.argocd_namespace.manifests[each.value]
+  depends_on = [ data.kustomization_build.argocd_namespace, data.talos_cluster_health.this ]
+}
+
+# install argocd
+# kustomize build argocd
+data "kustomization_build" "argocd" {
+  path = "kustomize/argocd/"
+}
+
+# kustomize deploy argocd
+resource "kustomization_resource" "argocd_p0" {
+  for_each   = data.kustomization_build.argocd.ids_prio[0]
+  manifest   = data.kustomization_build.argocd.manifests[each.value]
+  depends_on = [ data.kustomization_build.argocd, resource.kustomization_resource.argocd_namespace_p0 ]
+}
+
+resource "kustomization_resource" "argocd_p1" {
   for_each   = data.kustomization_build.argocd.ids_prio[1]
   manifest   = data.kustomization_build.argocd.manifests[each.value]
-  depends_on = [ data.kustomization_build.argocd ]
+  depends_on = [ resource.kustomization_resource.argocd_p0 ]
+}
+
+resource "kustomization_resource" "argocd_p2" {
+  for_each   = data.kustomization_build.argocd.ids_prio[2]
+  manifest   = data.kustomization_build.argocd.manifests[each.value]
+  depends_on = [ resource.kustomization_resource.argocd_p1 ]
+}
+
+# install argocd app of apps
+# kustomize build argocd app of apps
+data "kustomization_build" "argocd_app_of_apps" {
+  path = "kustomize/argocdAppOfApps/"
+}
+
+# kustomize deploy argocd app of apps
+resource "kustomization_resource" "argocd_app_of_apps_p1" {
+  for_each   = data.kustomization_build.argocd_app_of_apps.ids_prio[1]
+  manifest   = data.kustomization_build.argocd_app_of_apps.manifests[each.value]
+  depends_on = [ data.kustomization_build.argocd_app_of_apps, resource.kustomization_resource.argocd_p1, resource.kustomization_resource.argocd_p2 ]
 }
 
 ####################################################################################################################################################################################

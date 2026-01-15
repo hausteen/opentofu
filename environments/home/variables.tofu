@@ -4,12 +4,6 @@
 #   default     = "3.23.2"
 # }
 
-variable "argocd_helm_version" {
-  type        = string
-  description = "argocd helm image version"
-  default     = "9.2.4"
-}
-
 variable "kubernetes_api_endpoint" {
   type        = string
   description = "the external kubernetes api endpoint. will be the same as the talos vip for now"
@@ -19,13 +13,7 @@ variable "kubernetes_api_endpoint" {
 variable "kubernetes_cilium_cni_version" {
   type        = string
   description = "cilium cni version"
-  default     = "1.18.5"
-}
-
-variable "kubernetes_cluster_internal_dns_domain" {
-  type        = string
-  description = "the dns domain that the cluster will use internally. normally it is cluster.local"
-  default     = "kubernetes.internal"
+  default     = "1.18.6"
 }
 
 variable "kubernetes_cluster_name" {
@@ -42,7 +30,7 @@ variable "kubernetes_cluster_name" {
 variable "kubernetes_kubeconfig_path" {
   type        = string
   description = "path to kubeconfig file"
-  default     = "~/Documents/coding/talos-k8s/binaries/kubeconfig"
+  default     = "~/Documents/coding/talosK8s/binaries/kubeconfig"
 }
 
 variable "pve_api_endpoint" {
@@ -145,5 +133,5 @@ variable "talos_node_data" {
 variable "talos_talosconfig_path" {
   type        = string
   description = "path to talosconfig file"
-  default     = "~/Documents/coding/talos-k8s/binaries/talosconfig"
+  default     = "~/Documents/coding/talosK8s/binaries/talosconfig"
 }

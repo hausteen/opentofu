@@ -4,7 +4,6 @@ cluster:
   network:
     cni:
       name: none # needed for cilium
-    dnsDomain: ${kubernetes_cluster_internal_dns_domain}
     podSubnets:
       - 172.30.0.0/16
     serviceSubnets:
