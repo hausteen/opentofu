@@ -4,10 +4,6 @@ terraform {
       source = "hashicorp/helm"
       version = "3.1.1"
     }
-    kustomization = {
-      source = "kbst/kustomization"
-      version = "0.9.7"
-    }
     local = {
       source = "hashicorp/local"
       version = "2.6.1"
@@ -21,16 +17,6 @@ terraform {
       version = "0.9.0"
     }
   }
-}
-
-provider "helm" {
-  kubernetes = {
-    config_path = var.kubernetes_kubeconfig_path
-  }
-}
-
-provider "kustomization" {
-  kubeconfig_raw = resource.talos_cluster_kubeconfig.this.kubeconfig_raw
 }
 
 provider "proxmox" {
