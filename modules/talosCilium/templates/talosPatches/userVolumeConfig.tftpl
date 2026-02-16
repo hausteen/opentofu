@@ -1,0 +1,9 @@
+apiVersion: v1alpha1
+kind: UserVolumeConfig
+# this is for longhorn csi storage
+name: longhorn # lowercase/ uppercase/ digits/ dashes. 34 chars max.
+provisioning:
+  diskSelector:
+    match: "!system_disk"
+  grow: true
+  minSize: 10GB # arbitrary size chosen so long as its less than the actual disk's size in talos. disk size is set in proxmox vm creation.

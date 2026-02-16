@@ -1,0 +1,6 @@
+version: v1alpha1
+cluster:
+  inlineManifests:
+    - name: cilium
+      contents: |
+        ${indent(8, cilium_manifest)}
