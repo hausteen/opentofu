@@ -3,10 +3,10 @@ module "talos_cilium" {
   pve_hostnames              = ["pve1"]
   kubernetes_cluster_name    = "home"
   kubernetes_api_endpoint_ip = "192.168.20.10"
-  kubernetes_kubeconfig_path = "~/Documents/coding/binaries/kubeconfig"
+  kubernetes_kubeconfig_path = "~/Documents/coding/binaries/kubeconfigHome"
   talos_cluster_name         = "home"
   talos_cluster_endpoint_vip = "192.168.20.10"
-  talos_talosconfig_path     = "~/Documents/coding/binaries/talosconfig"
+  talos_talosconfig_path     = "~/Documents/coding/binaries/talosconfigHome"
   talos_default_gateway      = "192.168.20.1"
   talos_node_data = {
     control_planes = {
