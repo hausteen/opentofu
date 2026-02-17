@@ -15,21 +15,21 @@ module "talos_cilium" {
         ip           = "192.168.20.21"
         proxmox_node = "pve1"
         name         = "talosControlPlane00"
-        tags         = ["lab", "managed by opentofu", "talos control plane"]
+        tags         = ["lab", "managedByOpentofu", "talosControlPlane"]
       }
       node01 = {
         vm_id        = 122
         ip           = "192.168.20.22"
         proxmox_node = "pve1"
         name         = "talosControlPlane01"
-        tags         = ["lab", "managed by opentofu", "talos control plane"]
+        tags         = ["lab", "managedByOpentofu", "talosControlPlane"]
       }
       node02 = {
         vm_id        = 123
         ip           = "192.168.20.23"
         proxmox_node = "pve1"
         name         = "talosControlPlane02"
-        tags         = ["lab", "managed by opentofu", "talos control plane"]
+        tags         = ["lab", "managedByOpentofu", "talosControlPlane"]
       }
     }
     workers = {
@@ -38,21 +38,21 @@ module "talos_cilium" {
         ip           = "192.168.20.24"
         proxmox_node = "pve1"
         name         = "talosWorker00"
-        tags         = ["lab", "managed by opentofu", "talos worker"]
+        tags         = ["lab", "managedByOpentofu", "talosWorker"]
       }
       node01 = {
         vm_id        = 125
         ip           = "192.168.20.25"
         proxmox_node = "pve1"
         name         = "talosWorker01"
-        tags         = ["lab", "managed by opentofu", "talos worker"]
+        tags         = ["lab", "managedByOpentofu", "talosWorker"]
       }
       node02 = {
         vm_id        = 126
         ip           = "192.168.20.26"
         proxmox_node = "pve1"
         name         = "talosWorker02"
-        tags         = ["lab", "managed by opentofu", "talos worker"]
+        tags         = ["lab", "managedByOpentofu", "talosWorker"]
       }
     }
   }
