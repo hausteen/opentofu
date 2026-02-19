@@ -49,11 +49,12 @@ variable "talos_linux_version" {
 }
 
 variable "talos_node_data" {
-  description = "a map of the proxmox talos node data. look at the module's variables file to see an example"
+  description = "a map of the proxmox talos node data."
   type = object({
     control_planes = map(object({
       vm_id        = number
       ip           = string
+      vlan_id      = number
       proxmox_node = string
       name         = string
       tags         = set(string)
@@ -61,6 +62,7 @@ variable "talos_node_data" {
     workers = map(object({
       vm_id        = number
       ip           = string
+      vlan_id      = number
       proxmox_node = string
       name         = string
       tags         = set(string)
@@ -71,46 +73,52 @@ variable "talos_node_data" {
 #       node00 = {
 #         vm_id        = 110
 #         ip           = "192.168.20.150"
+#         vlan_id      = 20
 #         proxmox_node = "pve1"
 #         name         = "talosControlPlane00"
-#         tags         = ["managed by opentofu", "talos control plane"]
+#         tags         = ["home", "managed-by-opentofu", "talos-control-plane"]
 #       }
 #       node01 = {
 #         vm_id        = 111
 #         ip           = "192.168.20.151"
+#         vlan_id      = 20
 #         proxmox_node = "pve2"
 #         name         = "talosControlPlane01"
-#         tags         = ["managed by opentofu", "talos control plane"]
+#         tags         = ["home", "managed-by-opentofu", "talos-control-plane"]
 #       }
 #       node02 = {
 #         vm_id        = 112
 #         ip           = "192.168.20.152"
+#         vlan_id      = 20
 #         proxmox_node = "pve3"
 #         name         = "talosControlPlane02"
-#         tags         = ["managed by opentofu", "talos control plane"]
+#         tags         = ["home", "managed-by-opentofu", "talos-control-plane"]
 #       }
 #     }
 #     workers = {
 #       node00 = {
 #         vm_id        = 120
 #         ip           = "192.168.20.160"
+#         vlan_id      = 20
 #         proxmox_node = "pve1"
 #         name         = "talosWorker00"
-#         tags         = ["managed by opentofu", " talos worker"]
+#         tags         = ["home", "managed-by-opentofu", "talos-worker"]
 #       }
 #       node01 = {
 #         vm_id        = 121
 #         ip           = "192.168.20.161"
+#         vlan_id      = 20
 #         proxmox_node = "pve2"
 #         name         = "talosWorker01"
-#         tags         = ["managed by opentofu", " talos worker"]
+#         tags         = ["home", "managed-by-opentofu", "talos-worker"]
 #       }
 #       node02 = {
 #         vm_id        = 122
 #         ip           = "192.168.20.162"
+#         vlan_id      = 20
 #         proxmox_node = "pve3"
 #         name         = "talosWorker02"
-#         tags         = ["managed by opentofu", " talos worker"]
+#         tags         = ["home", "managed-by-opentofu", "talos-worker"]
 #       }
 #     }
 #   }

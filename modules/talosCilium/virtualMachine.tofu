@@ -48,7 +48,7 @@ resource "proxmox_virtual_environment_vm" "talos_control_plane" {
   }
   network_device {
     bridge  = "vmbr1"
-    vlan_id = 20
+    vlan_id = each.value.vlan_id
   }
   initialization {
     interface = "scsi1"
@@ -121,7 +121,7 @@ resource "proxmox_virtual_environment_vm" "talos_worker" {
   }
   network_device {
     bridge  = "vmbr1"
-    vlan_id = 20
+    vlan_id = each.value.vlan_id
   }
   initialization {
     interface = "scsi1"
